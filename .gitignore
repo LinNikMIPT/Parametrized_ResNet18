@@ -1,7 +1,5 @@
 # Ignored files
 __pycache__
 .idea
-logs
 configurations/output
 bin/data
-bin/history.json

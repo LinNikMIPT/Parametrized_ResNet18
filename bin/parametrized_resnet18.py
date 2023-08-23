@@ -87,13 +87,17 @@ def parametrized_model(model, hidden_size=128):
     return parametrized
 
 
-def train_model(model, train_dataloader, test_dataloader, optimizer, criterion, epochs=NUM_EPOCHS):
+def train_model(model, train_dataloader, test_dataloader, optimizer, criterion, logger,
+                epochs=NUM_EPOCHS, model_name=None):
     try:
         train_loss_history = []
         train_accuracy_history = []
         test_accuracy_history = []
 
-        logger.info(f"Start training {model.__class__.__name__}")
+        if model_name is None:
+            logger.info(f"Start training {model.__class__.__name__}")
+        else:
+            logger.info(f"Start training {model_name}")
         model.to(DEVICE)
 
         for epoch in range(epochs):
@@ -119,7 +123,11 @@ def train_model(model, train_dataloader, test_dataloader, optimizer, criterion, 
                     logger.info(f"test accuracy: {round(test_accuracy, 2)}%")
                     logger.info(f"train accuracy: {round(train_accuracy, 2)}%")
 
-        logger.info(f"Finished training {model.__class__.__name__} \n")
+        if model_name is None:
+            logger.info(f"Finished training {model.__class__.__name__} \n")
+        else:
+            logger.info(f"Finished training {model_name} \n")
+
         return train_loss_history, train_accuracy_history, test_accuracy_history
     except Exception:
         logger.exception(f"Critical error in {train_model.__name__}!")
@@ -143,11 +151,13 @@ def evaluate_accuracy(model, dataloader):
 
 
 def compare_model_with_parametrized_model(num_experiments, criterion, train_dataloader, test_dataloader,
-                                          start_num_epochs, stop_num_epochs):
+                                          start_num_epochs, stop_num_epochs, logger):
     history = []
     history_parametrized = []
 
-    for _ in range(num_experiments):
+    for i in range(num_experiments):
+        logger.info(50*"-" + f"experiment num {i}" + 50*"-")
+
         epoch = random.randint(start_num_epochs, stop_num_epochs)
         logger.info(f"Num epochs: {epoch}")
 
@@ -158,21 +168,27 @@ def compare_model_with_parametrized_model(num_experiments, criterion, train_data
         parametrized_resnet_optimizer = optim.SGD(parametrized_resnet.parameters(), lr=0.001, momentum=0.9)
 
         train_loss_param, train_accuracy_history_param, test_accuracy_history_param = train_model(model=parametrized_resnet,
+                                                                                                  model_name="Parametrized_ResNet",
                                                                                                   train_dataloader=train_dataloader,
                                                                                                   test_dataloader=test_dataloader,
                                                                                                   criterion=criterion,
                                                                                                   optimizer=parametrized_resnet_optimizer,
-                                                                                                  epochs=epoch)
+                                                                                                  epochs=epoch,
+                                                                                                  logger=logger)
 
         train_loss, train_accuracy, test_accuracy = train_model(model=resnet,
+                                                                model_name="ResNet",
                                                                 train_dataloader=train_dataloader,
                                                                 test_dataloader=test_dataloader,
                                                                 criterion=criterion,
                                                                 optimizer=resnet_optimizer,
-                                                                epochs=epoch)
+                                                                epochs=epoch,
+                                                                logger=logger)
 
         history.append((train_loss, train_accuracy, test_accuracy))
         history_parametrized.append((train_loss_param, train_accuracy_history_param, test_accuracy_history_param))
+
+        logger.info("\n \n")
 
     return history, history_parametrized
 
@@ -190,39 +206,6 @@ def init_dataloaders(batch_size: int = 64, num_workers: int = 2, train_shuffle: 
 
     return train_dataloader, test_dataloader
 
-
-# if __name__ == "__main__":
-#     transform = transforms.Compose([transforms.Resize((224, 224)),
-#                                     transforms.ToTensor()])
-#     train_dataset = torchvision.datasets.CIFAR10(root=PATH2DATA, train=True, download=True, transform=transform)
-#     train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=64,
-#                                                    shuffle=True, num_workers=2)
-#     test_dataset = torchvision.datasets.CIFAR10(root=PATH2DATA, train=False, download=True, transform=transform)
-#     test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=64,
-#                                                   shuffle=False, num_workers=2)
-#
-#     resnet = models.resnet18(pretrained=False)
-#     parametrized_resnet = parametrized_model(resnet)
-#
-#     resnet_optimizer = optim.SGD(resnet.parameters(), lr=0.001, momentum=0.9)
-#     parametrized_resnet_optimizer = optim.SGD(parametrized_resnet.parameters(), lr=0.001, momentum=0.9)
-#
-#     criterion = nn.CrossEntropyLoss()
-#     epoch = 1
-#
-#     train_model(model=parametrized_resnet,
-#                 train_dataloader=train_dataloader,
-#                 test_dataloader=test_dataloader,
-#                 criterion=criterion,
-#                 optimizer=parametrized_resnet_optimizer,
-#                 epochs=epoch)
-#
-#     train_model(model=resnet,
-#                 train_dataloader=train_dataloader,
-#                 test_dataloader=test_dataloader,
-#                 criterion=criterion,
-#                 optimizer=resnet_optimizer,
-#                 epochs=epoch)
 
 if __name__ == "__main__":
     import argparse
@@ -254,7 +237,8 @@ if __name__ == "__main__":
                                                                           train_dataloader=train_dataloader,
                                                                           test_dataloader=test_dataloader,
                                                                           start_num_epochs=start_num_epochs,
-                                                                          stop_num_epochs=stop_num_epochs)
+                                                                          stop_num_epochs=stop_num_epochs,
+                                                                          logger=logger)
 
     history_json = {"history": history,
                     "history_parametrized": history_parametrized}
